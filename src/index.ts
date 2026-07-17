@@ -1,5 +1,7 @@
 import { Client, Events, GatewayIntentBits, MessageFlags } from "discord.js";
 import { loadCommands, loadComponents } from "./registry.js";
+import { handleMemberAdd } from "./events/guildMemberAdd.js";
+import { startCounterTimer, updateGuildCounters } from "./lib/counterService.js";
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -33,7 +35,9 @@ client.once(Events.ClientReady, async (c) => {
   }
   for (const guild of c.guilds.cache.values()) {
     await guild.members.fetch().catch(err => console.error(`member fetch failed for ${guild.id}:`, err));
+    await updateGuildCounters(guild).catch(err => console.error("initial counters failed:", err));
   }
+  startCounterTimer(c);
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
@@ -53,6 +57,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
       else await interaction.reply(payload).catch(() => {});
     }
   }
+});
+
+client.on(Events.GuildMemberAdd, (member) => {
+  handleMemberAdd(member).catch(err => console.error("welcome failed:", err));
+  updateGuildCounters(member.guild).catch(err => console.error("counters failed:", err));
+});
+
+client.on(Events.GuildMemberRemove, (member) => {
+  updateGuildCounters(member.guild).catch(err => console.error("counters failed:", err));
 });
 
 client.login(token);
