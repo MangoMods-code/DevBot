@@ -12,10 +12,12 @@ export interface GuildConfig {
   member_counter_channel: string | null;
   bot_counter_channel: string | null;
   welcome_message: string | null;
+  rules_channel: string | null;
 }
 export const CONFIG_KEYS = [
   "welcome_channel", "ticket_category", "transcript_channel", "portfolio_channel",
   "vouch_channel", "member_counter_channel", "bot_counter_channel", "welcome_message",
+  "rules_channel",
 ] as const;
 export type ConfigKey = (typeof CONFIG_KEYS)[number];
 
@@ -41,7 +43,8 @@ export function createDb(path: string) {
       guild_id TEXT PRIMARY KEY,
       welcome_channel TEXT, ticket_category TEXT, transcript_channel TEXT,
       portfolio_channel TEXT, vouch_channel TEXT,
-      member_counter_channel TEXT, bot_counter_channel TEXT, welcome_message TEXT
+      member_counter_channel TEXT, bot_counter_channel TEXT, welcome_message TEXT,
+      rules_channel TEXT
     );
     CREATE TABLE IF NOT EXISTS services (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -70,7 +73,12 @@ export function createDb(path: string) {
     CREATE TABLE IF NOT EXISTS storefront_messages (
       guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL, message_id TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS rules_messages (
+      guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL, message_ids TEXT NOT NULL
+    );
   `);
+  // Databases created before rules support lack this column; ALTER throws if it already exists.
+  try { sqlite.exec("ALTER TABLE guild_config ADD COLUMN rules_channel TEXT"); } catch { /* column exists */ }
 
   return {
     raw: sqlite,
@@ -116,6 +124,19 @@ export function createDb(path: string) {
     getStorefront(guildId: string): { guild_id: string; channel_id: string; message_id: string } | undefined {
       return sqlite.prepare("SELECT * FROM storefront_messages WHERE guild_id = ?").get(guildId) as
         { guild_id: string; channel_id: string; message_id: string } | undefined;
+    },
+
+    setRulesMessages(guildId: string, channelId: string, messageIds: string[]): void {
+      sqlite.prepare(`
+        INSERT INTO rules_messages (guild_id, channel_id, message_ids) VALUES (?, ?, ?)
+        ON CONFLICT(guild_id) DO UPDATE SET channel_id = excluded.channel_id, message_ids = excluded.message_ids
+      `).run(guildId, channelId, JSON.stringify(messageIds));
+    },
+    getRulesMessages(guildId: string): { channel_id: string; message_ids: string[] } | undefined {
+      const row = sqlite.prepare("SELECT * FROM rules_messages WHERE guild_id = ?").get(guildId) as
+        { guild_id: string; channel_id: string; message_ids: string } | undefined;
+      if (!row) return undefined;
+      return { channel_id: row.channel_id, message_ids: JSON.parse(row.message_ids) as string[] };
     },
 
     openTicket(guildId: string, channelId: string, userId: string, serviceName: string, price: string): Ticket {

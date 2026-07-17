@@ -4,6 +4,7 @@ import {
 } from "discord.js";
 import type { Command } from "../registry.js";
 import { postStorefront } from "../lib/storefront.js";
+import { postRules } from "../lib/rules.js";
 import { db } from "../state.js";
 import { updateGuildCounters } from "../lib/counterService.js";
 
@@ -17,7 +18,11 @@ const setup: Command = {
       .addChannelOption(o => o.setName("channel").setDescription("Channel for the storefront")
         .setRequired(true).addChannelTypes(ChannelType.GuildText)))
     .addSubcommand(sub => sub.setName("counters")
-      .setDescription("Create locked member/bot counter voice channels")),
+      .setDescription("Create locked member/bot counter voice channels"))
+    .addSubcommand(sub => sub.setName("rules")
+      .setDescription("Post (or refresh) the server rules")
+      .addChannelOption(o => o.setName("channel").setDescription("Rules channel (remembered for next time)")
+        .addChannelTypes(ChannelType.GuildText))),
 
   async execute(interaction: ChatInputCommandInteraction) {
     if (!interaction.inGuild() || !interaction.guild) return;
@@ -47,6 +52,28 @@ const setup: Command = {
       await guild.members.fetch();
       await updateGuildCounters(guild);
       await interaction.editReply("Counter channels created. They update every ~5 minutes (Discord rename rate limits).");
+    }
+
+    if (sub === "rules") {
+      const picked = interaction.options.getChannel("channel");
+      const cfg = db.getConfig(interaction.guild.id);
+      const channelId = picked?.id ?? cfg.rules_channel;
+      if (!channelId) {
+        await interaction.reply({
+          content: "Tell me where the rules go: `/setup rules channel:#rules` (I'll remember it).",
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
+      const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
+      if (!channel?.isTextBased()) {
+        await interaction.reply({ content: "That rules channel no longer exists — pick another one.", flags: MessageFlags.Ephemeral });
+        return;
+      }
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      db.setConfig(interaction.guild.id, "rules_channel", channel.id);
+      await postRules(interaction.guild, channel);
+      await interaction.editReply(`Rules posted in ${channel}. Re-run \`/setup rules\` any time to refresh them (the old post gets replaced).`);
     }
   },
 };

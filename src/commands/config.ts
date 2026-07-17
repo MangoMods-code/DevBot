@@ -14,6 +14,7 @@ const CHANNEL_SETTINGS: { key: ConfigKey; label: string }[] = [
   { key: "vouch_channel", label: "Vouch channel" },
   { key: "member_counter_channel", label: "Member counter voice channel" },
   { key: "bot_counter_channel", label: "Bot counter voice channel" },
+  { key: "rules_channel", label: "Rules channel" },
 ];
 
 const config: Command = {

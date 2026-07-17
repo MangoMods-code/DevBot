@@ -67,3 +67,16 @@ describe("portfolio and storefront", () => {
     expect(db.getStorefront("g1")).toMatchObject({ channel_id: "c2", message_id: "m2" });
   });
 });
+
+describe("rules", () => {
+  it("stores rules channel in config", () => {
+    db.setConfig("g1", "rules_channel", "c5");
+    expect(db.getConfig("g1").rules_channel).toBe("c5");
+  });
+  it("round-trips rules message ids and upserts", () => {
+    db.setRulesMessages("g1", "c5", ["m1", "m2"]);
+    db.setRulesMessages("g1", "c6", ["m3"]);
+    expect(db.getRulesMessages("g1")).toEqual({ channel_id: "c6", message_ids: ["m3"] });
+    expect(db.getRulesMessages("g2")).toBeUndefined();
+  });
+});
