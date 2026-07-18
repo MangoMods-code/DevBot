@@ -138,8 +138,14 @@ export function createDb(path: string) {
         { guild_id: string; channel_id: string; message_id: string } | undefined;
       if (!row) return undefined;
       // Rows written before multi-message storefronts hold a bare message id, not JSON.
+      // A bare snowflake ("1395…") still parses as a JSON number, so only trust arrays.
       let ids: string[];
-      try { ids = JSON.parse(row.message_id) as string[]; } catch { ids = [row.message_id]; }
+      try {
+        const parsed: unknown = JSON.parse(row.message_id);
+        ids = Array.isArray(parsed) ? parsed.map(String) : [row.message_id];
+      } catch {
+        ids = [row.message_id];
+      }
       return { channel_id: row.channel_id, message_ids: ids };
     },
 

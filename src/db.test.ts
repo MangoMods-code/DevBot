@@ -71,6 +71,11 @@ describe("portfolio and storefront", () => {
       .run("g9", "c9", "m9");
     expect(db.getStorefront("g9")).toEqual({ channel_id: "c9", message_ids: ["m9"] });
   });
+  it("reads legacy snowflake ids (valid JSON numbers) as a single id", () => {
+    db.raw.prepare("INSERT INTO storefront_messages (guild_id, channel_id, message_id) VALUES (?, ?, ?)")
+      .run("g8", "c8", "1395123456789012345");
+    expect(db.getStorefront("g8")).toEqual({ channel_id: "c8", message_ids: ["1395123456789012345"] });
+  });
 });
 
 describe("automod keywords", () => {
