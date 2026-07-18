@@ -2,6 +2,7 @@ import { Client, Events, GatewayIntentBits, MessageFlags } from "discord.js";
 import { loadCommands, loadComponents } from "./registry.js";
 import { handleMemberAdd } from "./events/guildMemberAdd.js";
 import { handleMemberUpdate } from "./events/guildMemberUpdate.js";
+import { handleMessage } from "./events/messageCreate.js";
 import { startCounterTimer, updateGuildCounters } from "./lib/counterService.js";
 
 const token = process.env.DISCORD_TOKEN;
@@ -63,6 +64,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
 client.on(Events.GuildMemberAdd, (member) => {
   handleMemberAdd(member).catch(err => console.error("welcome failed:", err));
   updateGuildCounters(member.guild).catch(err => console.error("counters failed:", err));
+});
+
+client.on(Events.MessageCreate, (message) => {
+  handleMessage(message).catch(err => console.error("automod failed:", err));
 });
 
 client.on(Events.GuildMemberUpdate, (oldMember, newMember) => {

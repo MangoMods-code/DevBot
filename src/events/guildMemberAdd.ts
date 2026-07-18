@@ -5,6 +5,11 @@ import { renderWelcome, DEFAULT_WELCOME } from "../lib/welcome.js";
 export async function handleMemberAdd(member: GuildMember): Promise<void> {
   if (member.user.bot) return;
   const cfg = db.getConfig(member.guild.id);
+
+  if (cfg.autorole_id) {
+    await member.roles.add(cfg.autorole_id, "autorole").catch(err => console.error("autorole failed:", err));
+  }
+
   if (!cfg.welcome_channel) return;
   const channel = await member.guild.channels.fetch(cfg.welcome_channel).catch(() => null);
   if (!channel?.isTextBased()) return;

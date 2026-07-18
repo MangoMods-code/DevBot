@@ -18,7 +18,7 @@ A Discord bot that runs your dev-services front desk: a storefront of services w
 3. Still on the Bot tab, enable both privileged intents — the bot won't start without them:
    - **Server Members Intent** (welcome messages + counters)
    - **Message Content Intent** (ticket transcripts)
-4. **Installation** tab (or OAuth2 → URL Generator): scopes `bot` + `applications.commands`; bot permissions: **Manage Channels, View Channels, Send Messages, Read Message History, Connect, Attach Files**. Open the generated URL and invite the bot to your server.
+4. **Installation** tab (or OAuth2 → URL Generator): scopes `bot` + `applications.commands`; bot permissions: **Manage Channels, Manage Roles, Manage Messages, Kick Members, Ban Members, Moderate Members, View Channels, Send Messages, Read Message History, Connect, Attach Files**. Open the generated URL and invite the bot to your server. (Already invited it with fewer permissions? Just tick the missing ones on the bot's role in Server Settings → Roles.)
 
 ## 2. Local development
 
@@ -71,8 +71,14 @@ All of these are admin-only (Manage Server permission):
 | `/config set` / `view` / `welcome-message` | admin | Wire up channels and the welcome template |
 | `/service add` / `edit` / `remove` / `list` | admin | Manage the services you sell |
 | `/portfolio add` / `remove` / `list` | admin | Manage the project showcase |
-| `/setup storefront` / `counters` | admin | Post the storefront / create counter channels |
+| `/setup storefront` / `counters` / `rules` | admin | Post the storefront / create counter channels / post the rules |
+| `/roleall role:<role>` | admin (Manage Roles) | Give a role to every member who doesn't have it |
+| `/autorole set` / `off` / `view` | admin (Manage Roles) | Auto-assign a role to new members |
+| `/automod keyword-add` / `keyword-remove` / `keyword-list` | admin | Filter words/phrases → delete, kick, or ban |
+| `/automod links` / `mentions` / `view` | admin | Link filter with bypass role · mass-mention limit · settings overview |
 | **Close Ticket** button | ticket owner or admin | Archive transcript and delete the ticket channel |
+
+Automod notes: members with **Manage Messages** (your staff) bypass every filter, keyword matching is case-insensitive, the link filter catches `http(s)`, `www.`, and Discord invites, and `@everyone` counts as 5 toward the mention limit.
 
 ## Development
 

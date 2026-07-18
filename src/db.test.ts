@@ -68,6 +68,29 @@ describe("portfolio and storefront", () => {
   });
 });
 
+describe("automod keywords", () => {
+  it("stores keywords lowercased with upsert on action", () => {
+    db.addKeyword("g1", "BadWord", "delete");
+    db.addKeyword("g1", "badword", "ban");
+    expect(db.listKeywords("g1")).toEqual([{ word: "badword", action: "ban" }]);
+  });
+  it("removes and reports whether anything was removed", () => {
+    db.addKeyword("g1", "x", "delete");
+    expect(db.removeKeyword("g1", "X")).toBe(true);
+    expect(db.removeKeyword("g1", "x")).toBe(false);
+    expect(db.listKeywords("g1")).toEqual([]);
+  });
+  it("stores automod settings in config", () => {
+    db.setConfig("g1", "autorole_id", "r1");
+    db.setConfig("g1", "link_action", "delete");
+    db.setConfig("g1", "mention_limit", "8");
+    const cfg = db.getConfig("g1");
+    expect(cfg.autorole_id).toBe("r1");
+    expect(cfg.link_action).toBe("delete");
+    expect(cfg.mention_limit).toBe("8");
+  });
+});
+
 describe("rules", () => {
   it("stores rules channel in config", () => {
     db.setConfig("g1", "rules_channel", "c5");

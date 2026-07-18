@@ -13,11 +13,15 @@ export interface GuildConfig {
   bot_counter_channel: string | null;
   welcome_message: string | null;
   rules_channel: string | null;
+  autorole_id: string | null;
+  link_action: string | null;
+  link_bypass_role: string | null;
+  mention_limit: string | null;
 }
 export const CONFIG_KEYS = [
   "welcome_channel", "ticket_category", "transcript_channel", "portfolio_channel",
   "vouch_channel", "member_counter_channel", "bot_counter_channel", "welcome_message",
-  "rules_channel",
+  "rules_channel", "autorole_id", "link_action", "link_bypass_role", "mention_limit",
 ] as const;
 export type ConfigKey = (typeof CONFIG_KEYS)[number];
 
@@ -44,7 +48,8 @@ export function createDb(path: string) {
       welcome_channel TEXT, ticket_category TEXT, transcript_channel TEXT,
       portfolio_channel TEXT, vouch_channel TEXT,
       member_counter_channel TEXT, bot_counter_channel TEXT, welcome_message TEXT,
-      rules_channel TEXT
+      rules_channel TEXT, autorole_id TEXT, link_action TEXT, link_bypass_role TEXT,
+      mention_limit TEXT
     );
     CREATE TABLE IF NOT EXISTS services (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -76,9 +81,16 @@ export function createDb(path: string) {
     CREATE TABLE IF NOT EXISTS rules_messages (
       guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL, message_ids TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS automod_keywords (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      guild_id TEXT NOT NULL, word TEXT NOT NULL, action TEXT NOT NULL,
+      UNIQUE(guild_id, word)
+    );
   `);
-  // Databases created before rules support lack this column; ALTER throws if it already exists.
-  try { sqlite.exec("ALTER TABLE guild_config ADD COLUMN rules_channel TEXT"); } catch { /* column exists */ }
+  // Databases created before these settings existed lack the columns; ALTER throws if one already exists.
+  for (const col of ["rules_channel", "autorole_id", "link_action", "link_bypass_role", "mention_limit"]) {
+    try { sqlite.exec(`ALTER TABLE guild_config ADD COLUMN ${col} TEXT`); } catch { /* column exists */ }
+  }
 
   return {
     raw: sqlite,
@@ -124,6 +136,22 @@ export function createDb(path: string) {
     getStorefront(guildId: string): { guild_id: string; channel_id: string; message_id: string } | undefined {
       return sqlite.prepare("SELECT * FROM storefront_messages WHERE guild_id = ?").get(guildId) as
         { guild_id: string; channel_id: string; message_id: string } | undefined;
+    },
+
+    addKeyword(guildId: string, word: string, action: string): void {
+      sqlite.prepare(`
+        INSERT INTO automod_keywords (guild_id, word, action) VALUES (?, ?, ?)
+        ON CONFLICT(guild_id, word) DO UPDATE SET action = excluded.action
+      `).run(guildId, word.toLowerCase(), action);
+    },
+    removeKeyword(guildId: string, word: string): boolean {
+      const r = sqlite.prepare("DELETE FROM automod_keywords WHERE guild_id = ? AND word = ?")
+        .run(guildId, word.toLowerCase());
+      return r.changes > 0;
+    },
+    listKeywords(guildId: string): { word: string; action: string }[] {
+      return sqlite.prepare("SELECT word, action FROM automod_keywords WHERE guild_id = ? ORDER BY word")
+        .all(guildId) as { word: string; action: string }[];
     },
 
     setRulesMessages(guildId: string, channelId: string, messageIds: string[]): void {
