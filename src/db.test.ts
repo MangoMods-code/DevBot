@@ -61,10 +61,15 @@ describe("portfolio and storefront", () => {
     db.removePortfolio(p.id);
     expect(db.listPortfolio("g1")).toEqual([]);
   });
-  it("storefront upsert", () => {
-    db.setStorefront("g1", "c1", "m1");
-    db.setStorefront("g1", "c2", "m2");
-    expect(db.getStorefront("g1")).toMatchObject({ channel_id: "c2", message_id: "m2" });
+  it("storefront upsert with multiple message ids", () => {
+    db.setStorefront("g1", "c1", ["m1"]);
+    db.setStorefront("g1", "c2", ["m2", "m3"]);
+    expect(db.getStorefront("g1")).toEqual({ channel_id: "c2", message_ids: ["m2", "m3"] });
+  });
+  it("reads legacy single-id storefront rows", () => {
+    db.raw.prepare("INSERT INTO storefront_messages (guild_id, channel_id, message_id) VALUES (?, ?, ?)")
+      .run("g9", "c9", "m9");
+    expect(db.getStorefront("g9")).toEqual({ channel_id: "c9", message_ids: ["m9"] });
   });
 });
 

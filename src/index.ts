@@ -48,7 +48,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await commands.get(interaction.commandName)?.execute(interaction);
     } else if (interaction.isAutocomplete()) {
       await commands.get(interaction.commandName)?.autocomplete?.(interaction);
-    } else if (interaction.isButton()) {
+    } else if (interaction.isButton() || interaction.isStringSelectMenu()) {
       await components.get(interaction.customId.split(":")[0])?.execute(interaction);
     }
   } catch (err) {

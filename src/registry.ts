@@ -2,7 +2,10 @@ import { readdirSync } from "node:fs";
 import type {
   AutocompleteInteraction, ButtonInteraction, ChatInputCommandInteraction,
   SlashCommandBuilder, SlashCommandOptionsOnlyBuilder, SlashCommandSubcommandsOnlyBuilder,
+  StringSelectMenuInteraction,
 } from "discord.js";
+
+export type ComponentInteraction = ButtonInteraction | StringSelectMenuInteraction;
 
 export interface Command {
   data: SlashCommandBuilder | SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandsOnlyBuilder;
@@ -12,7 +15,7 @@ export interface Command {
 
 export interface Component {
   prefix: string;
-  execute(interaction: ButtonInteraction): Promise<void>;
+  execute(interaction: ComponentInteraction): Promise<void>;
 }
 
 async function loadDir<T>(dir: URL): Promise<T[]> {

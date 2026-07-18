@@ -1,13 +1,13 @@
 import {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, EmbedBuilder,
   MessageFlags, PermissionFlagsBits,
-  type ButtonInteraction, type ChatInputCommandInteraction,
+  type ButtonInteraction, type ChatInputCommandInteraction, type StringSelectMenuInteraction,
 } from "discord.js";
 import { db } from "../state.js";
 import type { Service } from "../db.js";
 
 export async function openTicketFor(
-  interaction: ChatInputCommandInteraction | ButtonInteraction,
+  interaction: ChatInputCommandInteraction | ButtonInteraction | StringSelectMenuInteraction,
   service: Service,
 ): Promise<void> {
   const guild = interaction.guild;

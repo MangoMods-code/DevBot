@@ -127,15 +127,20 @@ export function createDb(path: string) {
       return sqlite.prepare("SELECT * FROM services WHERE guild_id = ? ORDER BY id").all(guildId) as Service[];
     },
 
-    setStorefront(guildId: string, channelId: string, messageId: string): void {
+    setStorefront(guildId: string, channelId: string, messageIds: string[]): void {
       sqlite.prepare(`
         INSERT INTO storefront_messages (guild_id, channel_id, message_id) VALUES (?, ?, ?)
         ON CONFLICT(guild_id) DO UPDATE SET channel_id = excluded.channel_id, message_id = excluded.message_id
-      `).run(guildId, channelId, messageId);
+      `).run(guildId, channelId, JSON.stringify(messageIds));
     },
-    getStorefront(guildId: string): { guild_id: string; channel_id: string; message_id: string } | undefined {
-      return sqlite.prepare("SELECT * FROM storefront_messages WHERE guild_id = ?").get(guildId) as
+    getStorefront(guildId: string): { channel_id: string; message_ids: string[] } | undefined {
+      const row = sqlite.prepare("SELECT * FROM storefront_messages WHERE guild_id = ?").get(guildId) as
         { guild_id: string; channel_id: string; message_id: string } | undefined;
+      if (!row) return undefined;
+      // Rows written before multi-message storefronts hold a bare message id, not JSON.
+      let ids: string[];
+      try { ids = JSON.parse(row.message_id) as string[]; } catch { ids = [row.message_id]; }
+      return { channel_id: row.channel_id, message_ids: ids };
     },
 
     addKeyword(guildId: string, word: string, action: string): void {

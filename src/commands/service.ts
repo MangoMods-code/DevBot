@@ -1,5 +1,5 @@
 import {
-  MessageFlags, PermissionFlagsBits, SlashCommandBuilder,
+  EmbedBuilder, MessageFlags, PermissionFlagsBits, SlashCommandBuilder,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import type { Command } from "../registry.js";
@@ -64,10 +64,18 @@ const service: Command = {
       if (interaction.guild) await refreshStorefront(interaction.guild);
     } else {
       const services = db.listServices(guildId);
-      const body = services.length
-        ? services.map(s => `**${s.name}** — ${s.price}\n${s.description}`).join("\n\n")
-        : "No services yet. Add one with `/service add`.";
-      await interaction.reply({ content: body, flags: MessageFlags.Ephemeral });
+      if (!services.length) {
+        await interaction.reply({ content: "No services yet. Add one with `/service add`.", flags: MessageFlags.Ephemeral });
+        return;
+      }
+      const embed = new EmbedBuilder()
+        .setColor(0x57f287)
+        .setTitle(`Services (${services.length})`);
+      for (const s of services.slice(0, 25)) {
+        embed.addFields({ name: `${s.name}  ·  ${s.price}`, value: s.description });
+      }
+      if (services.length > 25) embed.setFooter({ text: `…and ${services.length - 25} more (the storefront shows them all)` });
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }
   },
 

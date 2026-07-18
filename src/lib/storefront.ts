@@ -1,47 +1,82 @@
 import {
-  ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder,
-  type Guild, type GuildTextBasedChannel,
+  ActionRowBuilder, EmbedBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
+  type BaseMessageOptions, type Guild, type GuildTextBasedChannel,
 } from "discord.js";
 import { db } from "../state.js";
 import type { Service } from "../db.js";
+import { chunkServices, menuOptionDescription } from "./storefrontLayout.js";
 
-const MAX_BUTTONS = 25; // 5 rows x 5 buttons
+const GREEN = 0x57f287;
 
-function buildStorefront(services: Service[]) {
-  const embed = new EmbedBuilder()
-    .setTitle("🛠️ Services")
-    .setColor(0x57f287)
-    .setDescription(
-      services.length
-        ? services.map(s => `**${s.name}** — \`${s.price}\`\n${s.description}`).join("\n\n")
-        : "No services listed yet."
-    )
-    .setFooter({ text: "Click a button below to open an order ticket" });
-
-  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
-  for (let i = 0; i < Math.min(services.length, MAX_BUTTONS); i += 5) {
-    rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(
-      services.slice(i, i + 5).map(s =>
-        new ButtonBuilder()
-          .setCustomId(`order:${s.id}`)
-          .setLabel(`Order: ${s.name}`.slice(0, 80))
-          .setStyle(ButtonStyle.Primary)
-      )
-    ));
+function buildMessages(services: Service[]): BaseMessageOptions[] {
+  if (services.length === 0) {
+    return [{
+      embeds: [new EmbedBuilder()
+        .setColor(GREEN)
+        .setTitle("🛠️ Services")
+        .setDescription("Nothing listed yet — check back soon.")],
+      components: [],
+    }];
   }
-  return { embeds: [embed], components: rows };
+
+  const chunks = chunkServices(services);
+  return chunks.map((chunk, i) => {
+    const first = i === 0;
+    const last = i === chunks.length - 1;
+
+    const embed = new EmbedBuilder()
+      .setColor(GREEN)
+      .setTitle(first ? "🛠️ Services" : `🛠️ Services — continued (${i + 1}/${chunks.length})`);
+    if (first) {
+      embed.setDescription(
+        "Pick a service from the menu below and a **private order ticket** opens just for you — " +
+        "no forms, no DMs, no pressure. Prices ending in `+` are starting points; " +
+        "your exact quote depends on the job."
+      );
+    }
+    for (const s of chunk) {
+      embed.addFields({ name: `${s.name}  ·  ${s.price}`, value: s.description });
+    }
+    if (last) {
+      embed.setFooter({ text: "Payment is arranged inside your ticket · vouches come from real orders only" });
+      embed.setTimestamp();
+    }
+
+    const menu = new StringSelectMenuBuilder()
+      .setCustomId("ordermenu")
+      .setPlaceholder("🛒 Choose a service to order…")
+      .addOptions(chunk.map(s =>
+        new StringSelectMenuOptionBuilder()
+          .setLabel(s.name.slice(0, 100))
+          .setDescription(menuOptionDescription(s.price, s.description))
+          .setValue(String(s.id))
+      ));
+
+    return {
+      embeds: [embed],
+      components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu)],
+    };
+  });
+}
+
+async function deleteStoredMessages(guild: Guild): Promise<void> {
+  const stored = db.getStorefront(guild.id);
+  if (!stored) return;
+  const channel = await guild.channels.fetch(stored.channel_id).catch(() => null);
+  if (!channel?.isTextBased()) return;
+  for (const id of stored.message_ids) {
+    await channel.messages.delete(id).catch(() => {});
+  }
 }
 
 export async function postStorefront(guild: Guild, channel: GuildTextBasedChannel): Promise<void> {
-  const existing = db.getStorefront(guild.id);
-  if (existing) {
-    const oldChannel = await guild.channels.fetch(existing.channel_id).catch(() => null);
-    if (oldChannel?.isTextBased()) {
-      await oldChannel.messages.delete(existing.message_id).catch(() => {});
-    }
+  await deleteStoredMessages(guild);
+  const ids: string[] = [];
+  for (const payload of buildMessages(db.listServices(guild.id))) {
+    const msg = await channel.send(payload);
+    ids.push(msg.id);
   }
-  const msg = await channel.send(buildStorefront(db.listServices(guild.id)));
-  db.setStorefront(guild.id, channel.id, msg.id);
+  db.setStorefront(guild.id, channel.id, ids);
 }
 
 export async function refreshStorefront(guild: Guild): Promise<void> {
@@ -49,7 +84,31 @@ export async function refreshStorefront(guild: Guild): Promise<void> {
   if (!stored) return;
   const channel = await guild.channels.fetch(stored.channel_id).catch(() => null);
   if (!channel?.isTextBased()) return;
-  const msg = await channel.messages.fetch(stored.message_id).catch(() => null);
-  if (!msg) return;
-  await msg.edit(buildStorefront(db.listServices(guild.id)));
+
+  const payloads = buildMessages(db.listServices(guild.id));
+
+  // Same number of messages → edit in place so the storefront doesn't jump to the bottom.
+  if (payloads.length === stored.message_ids.length) {
+    const messages = [];
+    for (const id of stored.message_ids) {
+      const m = await channel.messages.fetch(id).catch(() => null);
+      if (!m) break;
+      messages.push(m);
+    }
+    if (messages.length === payloads.length) {
+      for (let i = 0; i < payloads.length; i++) {
+        await messages[i].edit(payloads[i]);
+      }
+      return;
+    }
+  }
+
+  // Message count changed (or something was deleted) → repost cleanly.
+  await deleteStoredMessages(guild);
+  const ids: string[] = [];
+  for (const payload of payloads) {
+    const msg = await channel.send(payload);
+    ids.push(msg.id);
+  }
+  db.setStorefront(guild.id, channel.id, ids);
 }
