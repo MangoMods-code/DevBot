@@ -68,6 +68,7 @@ All of these are admin-only (Manage Server permission):
 | `/ping` | everyone | Latency + uptime |
 | `/order service:<name>` | everyone | Open an order ticket (same as clicking a storefront button) |
 | `/vouch rating:<1-5> comment:<text>` | clients with a closed ticket | Post a star-rating review |
+| `/addvouch customer:<name> rating:<1-5> comment:<text>` | admin | Post a vouch for a client who isn't on Discord (marked as staff-submitted) |
 | `/config set` / `view` / `welcome-message` | admin | Wire up channels and the welcome template |
 | `/service add` / `edit` / `remove` / `list` | admin | Manage the services you sell |
 | `/portfolio add` / `remove` / `list` | admin | Manage the project showcase |

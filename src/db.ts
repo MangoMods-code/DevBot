@@ -73,7 +73,8 @@ export function createDb(path: string) {
     CREATE TABLE IF NOT EXISTS vouches (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       guild_id TEXT NOT NULL, user_id TEXT NOT NULL, ticket_id INTEGER NOT NULL,
-      rating INTEGER NOT NULL, comment TEXT NOT NULL, created_at INTEGER NOT NULL
+      rating INTEGER NOT NULL, comment TEXT NOT NULL, created_at INTEGER NOT NULL,
+      customer_name TEXT
     );
     CREATE TABLE IF NOT EXISTS storefront_messages (
       guild_id TEXT PRIMARY KEY, channel_id TEXT NOT NULL, message_id TEXT NOT NULL
@@ -91,6 +92,8 @@ export function createDb(path: string) {
   for (const col of ["rules_channel", "autorole_id", "link_action", "link_bypass_role", "mention_limit"]) {
     try { sqlite.exec(`ALTER TABLE guild_config ADD COLUMN ${col} TEXT`); } catch { /* column exists */ }
   }
+  // customer_name distinguishes staff-submitted vouches for clients who aren't on Discord.
+  try { sqlite.exec("ALTER TABLE vouches ADD COLUMN customer_name TEXT"); } catch { /* column exists */ }
 
   return {
     raw: sqlite,
@@ -211,6 +214,12 @@ export function createDb(path: string) {
       sqlite.prepare(
         "INSERT INTO vouches (guild_id, user_id, ticket_id, rating, comment, created_at) VALUES (?, ?, ?, ?, ?, ?)"
       ).run(guildId, userId, ticketId, rating, comment, Date.now());
+    },
+    // A vouch an admin posts for an offline customer: no ticket (ticket_id 0), staff id kept for audit.
+    addManualVouch(guildId: string, staffId: string, customerName: string, rating: number, comment: string): void {
+      sqlite.prepare(
+        "INSERT INTO vouches (guild_id, user_id, ticket_id, rating, comment, created_at, customer_name) VALUES (?, ?, 0, ?, ?, ?, ?)"
+      ).run(guildId, staffId, rating, comment, Date.now(), customerName);
     },
 
     addPortfolio(guildId: string, name: string, description: string, image: string | null, link: string | null): PortfolioItem {

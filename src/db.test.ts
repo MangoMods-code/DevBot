@@ -53,6 +53,15 @@ describe("tickets and vouches", () => {
   });
 });
 
+describe("manual vouches", () => {
+  it("records a staff-submitted vouch with the customer name and no ticket", () => {
+    db.addManualVouch("g1", "staff1", "Jane Doe", 5, "great work");
+    const row = db.raw.prepare("SELECT * FROM vouches WHERE guild_id = ?").get("g1") as
+      { user_id: string; customer_name: string; rating: number; ticket_id: number };
+    expect(row).toMatchObject({ user_id: "staff1", customer_name: "Jane Doe", rating: 5, ticket_id: 0 });
+  });
+});
+
 describe("portfolio and storefront", () => {
   it("portfolio crud with message id", () => {
     const p = db.addPortfolio("g1", "AJD Site", "mechanic site", null, "https://x.com");
