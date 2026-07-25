@@ -73,6 +73,7 @@ All of these are admin-only (Manage Server permission):
 | `/service add` / `edit` / `remove` / `list` | admin | Manage the services you sell |
 | `/portfolio add` / `remove` / `list` | admin | Manage the project showcase |
 | `/setup storefront` / `counters` / `rules` | admin | Post the storefront / create counter channels / post the rules |
+| `/lock` / `/unlock` | admin (Manage Channels) | Lock the current channel so only staff can post, or unlock it |
 | `/roleall role:<role>` | admin (Manage Roles) | Give a role to every member who doesn't have it |
 | `/autorole set` / `off` / `view` | admin (Manage Roles) | Auto-assign a role to new members |
 | `/automod keyword-add` / `keyword-remove` / `keyword-list` | admin | Filter words/phrases → delete, kick, or ban |
