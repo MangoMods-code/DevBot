@@ -25,43 +25,55 @@ const portfolio: Command = {
 
   async execute(interaction: ChatInputCommandInteraction) {
     if (!interaction.inGuild() || !interaction.guild) return;
+    // Ack within Discord's 3-second window before any network work (channel fetch/send).
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const guildId = interaction.guildId;
     const sub = interaction.options.getSubcommand();
 
     if (sub === "add") {
       const cfg = db.getConfig(guildId);
       if (!cfg.portfolio_channel) {
-        await interaction.reply({ content: "Set a portfolio channel first: `/config set setting:Portfolio channel`.", flags: MessageFlags.Ephemeral });
+        await interaction.editReply("Set a portfolio channel first: `/config set setting:Portfolio channel`.");
         return;
       }
       const name = interaction.options.getString("name", true);
       if (db.getPortfolioItem(guildId, name)) {
-        await interaction.reply({ content: `A project named **${name}** already exists.`, flags: MessageFlags.Ephemeral });
+        await interaction.editReply(`A project named **${name}** already exists. Remove it first with \`/portfolio remove\` if you want to re-add it.`);
         return;
       }
       const image = interaction.options.getString("image");
       const link = interaction.options.getString("link");
       if ((image && !isHttpUrl(image)) || (link && !isHttpUrl(link))) {
-        await interaction.reply({ content: "Image and link must be full `https://` URLs.", flags: MessageFlags.Ephemeral });
+        await interaction.editReply("Image and link must be full `https://` URLs.");
         return;
       }
       const channel = await interaction.guild.channels.fetch(cfg.portfolio_channel).catch(() => null);
       if (!channel?.isTextBased()) {
-        await interaction.reply({ content: "The configured portfolio channel no longer exists — set it again.", flags: MessageFlags.Ephemeral });
+        await interaction.editReply("The configured portfolio channel no longer exists — set it again.");
         return;
       }
-      const item = db.addPortfolio(guildId, name, interaction.options.getString("description", true), image, link);
-      const embed = new EmbedBuilder().setTitle(name).setColor(0x5865f2).setDescription(item.description).setTimestamp();
+      const description = interaction.options.getString("description", true);
+      const embed = new EmbedBuilder()
+        .setColor(0x5865f2)
+        .setTitle(name)
+        .setDescription(description)
+        .setFooter({ text: interaction.guild.name, iconURL: interaction.guild.iconURL() ?? undefined })
+        .setTimestamp();
+      if (link) {
+        embed.setURL(link);
+        embed.addFields({ name: "🔗 Link", value: `[Open project](${link})` });
+      }
       if (image) embed.setImage(image);
-      if (link) embed.setURL(link);
+      // Post first; only record it in the DB once Discord accepts the message.
       const msg = await channel.send({ embeds: [embed] });
+      const item = db.addPortfolio(guildId, name, description, image, link);
       db.setPortfolioMessage(item.id, msg.id);
-      await interaction.reply({ content: `**${name}** posted to ${channel}.`, flags: MessageFlags.Ephemeral });
+      await interaction.editReply(`**${name}** posted to ${channel}.`);
     } else if (sub === "remove") {
       const name = interaction.options.getString("name", true);
       const item = db.getPortfolioItem(guildId, name);
       if (!item) {
-        await interaction.reply({ content: `No project named **${name}**.`, flags: MessageFlags.Ephemeral });
+        await interaction.editReply(`No project named **${name}**.`);
         return;
       }
       const cfg = db.getConfig(guildId);
@@ -70,13 +82,13 @@ const portfolio: Command = {
         if (channel?.isTextBased()) await channel.messages.delete(item.message_id).catch(() => {});
       }
       db.removePortfolio(item.id);
-      await interaction.reply({ content: `Removed **${name}**.`, flags: MessageFlags.Ephemeral });
+      await interaction.editReply(`Removed **${name}**.`);
     } else {
       const items = db.listPortfolio(guildId);
       const body = items.length
         ? items.map(p => `**${p.name}**${p.link ? ` — <${p.link}>` : ""}`).join("\n")
         : "No projects yet. Add one with `/portfolio add`.";
-      await interaction.reply({ content: body, flags: MessageFlags.Ephemeral });
+      await interaction.editReply(body);
     }
   },
 

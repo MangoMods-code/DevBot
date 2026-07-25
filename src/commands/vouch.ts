@@ -14,28 +14,28 @@ const vouch: Command = {
 
   async execute(interaction: ChatInputCommandInteraction) {
     if (!interaction.inGuild() || !interaction.guild) return;
+    // Ack within Discord's 3-second window before any network work (channel fetch/send).
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const guildId = interaction.guildId;
 
     const cfg = db.getConfig(guildId);
     if (!cfg.vouch_channel) {
-      await interaction.reply({ content: "Vouches aren't set up yet — an admin needs to run `/config set setting:Vouch channel`.", flags: MessageFlags.Ephemeral });
+      await interaction.editReply("Vouches aren't set up yet — an admin needs to run `/config set setting:Vouch channel`.");
       return;
     }
     const ticket = db.getUnvouchedClosedTicket(guildId, interaction.user.id);
     if (!ticket) {
-      await interaction.reply({ content: "Vouches are reserved for clients with a completed order ticket.", flags: MessageFlags.Ephemeral });
+      await interaction.editReply("Vouches are reserved for clients with a completed order ticket.");
       return;
     }
     const channel = await interaction.guild.channels.fetch(cfg.vouch_channel).catch(() => null);
     if (!channel?.isTextBased()) {
-      await interaction.reply({ content: "The configured vouch channel no longer exists — an admin needs to set it again.", flags: MessageFlags.Ephemeral });
+      await interaction.editReply("The configured vouch channel no longer exists — an admin needs to set it again.");
       return;
     }
 
     const rating = interaction.options.getInteger("rating", true);
     const comment = interaction.options.getString("comment", true);
-    db.addVouch(guildId, interaction.user.id, ticket.id, rating, comment);
-    db.markVouched(ticket.id);
 
     const stars = "★".repeat(rating) + "☆".repeat(5 - rating);
     const embed = new EmbedBuilder()
@@ -45,8 +45,11 @@ const vouch: Command = {
       .setDescription(comment)
       .addFields({ name: "Service", value: ticket.service_name, inline: true })
       .setTimestamp();
+    // Post first; only consume the user's vouch eligibility once the review actually posts.
     await channel.send({ embeds: [embed] });
-    await interaction.reply({ content: "Thanks for the vouch!", flags: MessageFlags.Ephemeral });
+    db.addVouch(guildId, interaction.user.id, ticket.id, rating, comment);
+    db.markVouched(ticket.id);
+    await interaction.editReply("Thanks for the vouch!");
   },
 };
 
