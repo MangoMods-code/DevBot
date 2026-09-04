@@ -33,10 +33,20 @@ export async function updateGuildCounters(guild: Guild): Promise<void> {
   if (cfg.bot_counter_channel) await renameIfNeeded(guild, cfg.bot_counter_channel, "Bots", bots);
 }
 
+// The member cache is only fully populated once (on first ClientReady). If the gateway
+// ever drops and reconnects — normal over long uptimes — Discord.js rebuilds guild state
+// without re-fetching the full member list, so the cache can silently shrink down to just
+// whoever's recently interacted with the bot. Re-fetching here before every periodic tick
+// keeps the cache (and therefore the counters) self-healing instead of staying stuck stale.
+async function refreshAndUpdate(guild: Guild): Promise<void> {
+  await guild.members.fetch().catch(err => console.error(`member fetch failed for ${guild.id}:`, err));
+  await updateGuildCounters(guild).catch(err => console.error("counter update failed:", err));
+}
+
 export function startCounterTimer(client: Client): void {
   setInterval(() => {
     for (const guild of client.guilds.cache.values()) {
-      updateGuildCounters(guild).catch(err => console.error("counter update failed:", err));
+      refreshAndUpdate(guild);
     }
   }, 5 * 60 * 1000);
 }
