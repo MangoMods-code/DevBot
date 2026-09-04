@@ -2,8 +2,23 @@ import { EmbedBuilder, time, TimestampStyles, type GuildMember } from "discord.j
 import { db } from "../state.js";
 import { renderWelcome, DEFAULT_WELCOME } from "../lib/welcome.js";
 
+// Gateway reconnects can occasionally redeliver a GuildMemberAdd event the bot already
+// processed, which used to send the welcome message (and re-run autorole) twice for the
+// same join. Claim the join in-memory before doing anything else so a redelivered event
+// within the window is dropped; a real re-join after that window still gets welcomed.
+const recentJoins = new Set<string>();
+const JOIN_DEDUPE_WINDOW_MS = 15_000;
+
+function claimJoin(key: string): boolean {
+  if (recentJoins.has(key)) return false;
+  recentJoins.add(key);
+  setTimeout(() => recentJoins.delete(key), JOIN_DEDUPE_WINDOW_MS);
+  return true;
+}
+
 export async function handleMemberAdd(member: GuildMember): Promise<void> {
   if (member.user.bot) return;
+  if (!claimJoin(`${member.guild.id}:${member.id}`)) return;
   const cfg = db.getConfig(member.guild.id);
 
   if (cfg.autorole_id) {
